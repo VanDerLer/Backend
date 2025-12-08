@@ -10,7 +10,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/webauthn")
-@CrossOrigin(origins = "http://localhost:5173") // 🔓 libera CORS pro Vite
+@CrossOrigin(origins = "https://vanderler.netlify.app") // 🔓 libera CORS pro Vite
 public class WebAuthnController {
 
     private final WebAuthnService webAuthnService;

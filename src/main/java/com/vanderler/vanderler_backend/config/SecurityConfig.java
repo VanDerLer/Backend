@@ -45,27 +45,29 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // 🔐 desabilita CSRF (API stateless com JWT)
+            // API stateless com JWT
             .csrf(csrf -> csrf.disable())
-
-            // 🔓 ativa CORS global (usa o bean corsConfigurationSource)
             .cors(Customizer.withDefaults())
-
-            // sessão stateless
             .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // regras de autorização
             .authorizeHttpRequests(auth -> auth
-                // libera pré-flight CORS de qualquer rota
+                // CORS preflight
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                // 🔓 DEBUG: liberar /face/** pra gente ver se o controller está sendo chamado
-                .requestMatchers("/face/**").permitAll()
-                // se depois quiser exigir login:
-                // .requestMatchers("/face/**").authenticated()
-
-                // Auth público
+                // 🔓 Auth completamente público
                 .requestMatchers("/auth/**").permitAll()
+
+                // 🔓 WebAuthn routes (opções + finalização) vão exigir usuário logado,
+                // MAS isso é controlado dentro dos métodos via getUsuarioLogado().
+                // Se você quiser deixar público, troque para .permitAll()
+                .requestMatchers("/webauthn/**").authenticated()
+
+                // 🔓 se tiver Swagger, deixa público
+                .requestMatchers(
+                        "/v3/api-docs/**",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html"
+                ).permitAll()
 
                 // ===== PERFIL (precisa estar autenticado) =====
                 .requestMatchers(HttpMethod.GET, "/api/users/me").authenticated()
@@ -84,26 +86,21 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/books/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/books/**").hasRole("ADMIN")
 
-                // resto: precisa estar autenticado
+                // 🔒 Tudo o resto precisa estar autenticado
                 .anyRequest().authenticated()
             )
 
-            // registra o AuthenticationProvider com o CustomUserDetailsService
             .authenticationProvider(authenticationProvider())
-
-            // adiciona o filtro JWT antes do filtro padrão de login
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // === Encoder padrão (BCrypt) ===
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // === AuthenticationProvider usando o CustomUserDetailsService ===
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -112,24 +109,19 @@ public class SecurityConfig {
         return authProvider;
     }
 
-    // === AuthenticationManager para injetar no UserService ===
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config
+    ) throws Exception {
         return config.getAuthenticationManager();
     }
 
-    // 🔓 CORS global: libera o front Vite (http://localhost:5173)
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        // origem do front
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
-
-        // métodos permitidos
+        config.setAllowedOrigins(List.of("https://vanderler.netlify.app"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-
-        // headers permitidos
         config.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
@@ -137,12 +129,10 @@ public class SecurityConfig {
                 "Accept",
                 "Origin"
         ));
-
         config.setAllowCredentials(true);
-        config.setMaxAge(3600L); // cache do preflight em segundos
+        config.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // aplica CORS pra todas as rotas
         source.registerCorsConfiguration("/**", config);
 
         return source;

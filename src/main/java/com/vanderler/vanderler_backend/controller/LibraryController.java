@@ -16,7 +16,7 @@ import com.vanderler.vanderler_backend.service.BookService;
 
 @RestController
 @RequestMapping("/api/library")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = "https://vanderler.netlify.app")
 public class LibraryController {
 
     private final BookService bookService;
